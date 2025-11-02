@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>有趣的礼物(heworkalin测试)</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden; /* 隐藏滚动条 */
+        }
+        .note-wall {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background-color: transparent;
+            overflow: hidden;
+        }
+        .note {
+            position: absolute;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.1);
+            transform: rotate(-2deg) translateY(20px);
+            opacity: 0;
+            animation: jumpIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            width: 120px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            z-index: 10; /* 确保窗口在最上层 */
+        }
+        @keyframes jumpIn {
+            0% { transform: rotate(-2deg) translateY(20px); opacity: 0; }
+            60% { transform: rotate(-2deg) translateY(-8px); opacity: 0.9; }
+            100% { transform: rotate(-2deg) translateY(0); opacity: 1; }
+        }
+        .note:hover {
+            transform: rotate(0deg) scale(1.1);
+            transition: transform 0.3s ease;
+            z-index: 20; /* hover时置顶 */
+        }
+        .note p {
+            margin: 0;
+            font-family: "微软雅黑", sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .audio-control {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            z-index: 999;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="note-wall" id="noteWall"></div>
+    <audio id="backgroundMusic" preload="auto" loop>
+        <source src="mp3.mp3" type="audio/mpeg">
+        您的浏览器不支持音频播放，请更新浏览器后重试~
+    </audio>
+    <button class="audio-control" onclick="toggleAudio()">暂停音频</button>
+
+    <script>
+        // ===================== 配置参数区（直接修改这里即可）=====================
+        const config = {
+            noteTexts: [ // 窗口显示的文字内容（循环复用，不用管长度）
+                "顺顺 别太累啦，偶尔偷懒也好",
+                "多喝水准~",
+                "记得好好护肤",
+                "今天过得开心哦",
+                "期待下一次见面",
+                "早点休息",
+                "你超棒的",
+                "梦想成真",
+                "我想你了",
+                "别熬夜",
+                "学会爱自己，才能更好地爱别人",
+                "记得吃水果",
+                "愿所有烦恼都消失",
+                "保持好心情",
+                "保持微笑呀",
+                "每一刻都值得珍惜",
+                "金榜题名",
+                "要相信自己噢",
+                "天冷了，多穿衣服",
+                "好好爱自己",
+                "每天都要元气满满",
+                "顺顺利利",
+                "今天过得开心嘛",
+                "捐微笑呀",
+                "别太累"
+            ],
+            noteColors: [ // 窗口颜色数组（循环使用）
+                "#fff0f0", "#f0fff0", "#f0f0ff", "#fffacd", "#f5f5dc"
+            ],
+            batchSize: 4, // 每次弹出的窗口数量（越多铺满越快）
+            interval: 100, // 每批弹出间隔（300=0.3秒，越快越密集）
+            loopTimes: 0, // 整体循环次数（1=1次铺满，3=3次铺满循环）
+            jumpAmplitude: 8, // 跳动幅度（单位：px）
+            maxNotes: 80 // 单轮最大窗口数（根据屏幕大小调整，80足够铺满手机/电脑屏）
+        };
+        // ======================================================================
+
+        const noteWall = document.getElementById("noteWall");
+        const audio = document.getElementById("backgroundMusic");
+        let currentNoteIndex = 0; // 当前使用的文字索引
+        let currentLoop = 0; // 当前循环次数
+        let currentNoteCount = 0; // 当前轮已弹出的窗口数
+
+        // 页面加载完成后自动播放音频
+        window.addEventListener("DOMContentLoaded", () => {
+            audio.play().catch(() => {
+                alert("音频自动播放被限制，请点击页面任意位置继续~");
+                document.body.addEventListener("click", () => audio.play(), { once: true });
+            });
+            startNewLoop(); // 启动第一轮铺满
+        });
+
+        // 启动新一轮（清空屏幕+开始弹出）
+        function startNewLoop() {
+            currentLoop++;
+            // 达到循环次数则停止
+            if (config.loopTimes !== 0 && currentLoop > config.loopTimes) {
+                return;
+            }
+            // 清空屏幕（二次循环时触发）
+            noteWall.innerHTML = "";
+            currentNoteCount = 0;
+            currentNoteIndex = 0;
+            // 开始批量弹出窗口
+            batchShowNotes();
+        }
+
+        // 分批弹出窗口（直到铺满屏幕）
+        function batchShowNotes() {
+            // 单轮窗口数达到最大值（铺满），启动下一轮
+            if (currentNoteCount >= config.maxNotes) {
+                setTimeout(startNewLoop, 1000); // 间隔1秒后开始下一轮
+                return;
+            }
+
+            // 弹出当前批的窗口
+            for (let i = 0; i < config.batchSize && currentNoteCount < config.maxNotes; i++) {
+                const text = config.noteTexts[currentNoteIndex % config.noteTexts.length];
+                const colorIndex = currentNoteIndex % config.noteColors.length;
+                const note = createNote(text, colorIndex);
+                noteWall.appendChild(note);
+                currentNoteIndex++;
+                currentNoteCount++;
+            }
+
+            // 继续下一批弹出
+            setTimeout(batchShowNotes, config.interval);
+        }
+
+        // 生成单个窗口（带跳动效果）
+        function createNote(text, colorIndex) {
+            const note = document.createElement("div");
+            note.className = "note";
+            note.style.backgroundColor = config.noteColors[colorIndex];
+            // 全屏随机分布（确保铺满无死角）
+            note.style.left = `${Math.random() * (100 - 12)}vw`; // 减去窗口宽度百分比
+            note.style.top = `${Math.random() * (100 - 8)}vh`; // 减去窗口高度百分比
+            note.style.transform = `rotate(${Math.random() * 4 - 2}deg) translateY(20px)`; // 随机小角度旋转
+            note.style.animation = `jumpIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards`;
+            
+            // 锐角美化
+            note.innerHTML = `<p>${text}</p>`;
+            note.innerHTML += `
+                <style>
+                    @keyframes jumpIn {
+                        0% { transform: rotate(${note.style.transform.split('(')[1].split(')')[0]}) translateY(20px); opacity: 0; }
+                        60% { transform: rotate(${note.style.transform.split('(')[1].split(')')[0]}) translateY(-${config.jumpAmplitude}px); opacity: 0.9; }
+                        100% { transform: rotate(${note.style.transform.split('(')[1].split(')')[0]}) translateY(0); opacity: 1; }
+                    }
+                    .note:last-child::before {
+                        content: '';
+                        position: absolute;
+                        bottom: -4px;
+                        right: 8px;
+                        width: 0;
+                        height: 0;
+                        border-left: 8px solid transparent;
+                        border-top: 8px solid ${config.noteColors[colorIndex]};
+                        transform: rotate(45deg);
+                    }
+                </style>
+            `;
+            return note;
+        }
+
+        // 音频控制
+        function toggleAudio() {
+            const btn = document.querySelector(".audio-control");
+            audio.paused ? (audio.play(), btn.textContent = "暂停音频") : (audio.pause(), btn.textContent = "播放音频");
+        }
+    </script>
+</body>
+</html>
