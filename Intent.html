@@ -15,7 +15,7 @@
 <script>
 (function () {
   var msg = document.getElementById('msg');
-
+  //目前测试来看，只有浏览器via允许这种显性的直接调用，不是所有的浏览器支持，chrome需要引入他的什么什么东西，不支持这种行为
   // 1. 取出 ? 后面的原始内容，格式形如：=包名/活动全路径
   var raw = window.location.search.substring(1); // 去掉开头的 "?"
   if (!raw) { msg.textContent = '缺少参数'; return; }
@@ -32,7 +32,7 @@
   var component = pkg + '/' + activity;
 
   // 4. 兜底地址（唤起失败时跳这里）
-  var fallbackUrl = 'https://你的域名/fallback';
+  var fallbackUrl = 'https://heworkalin.github.io/Intent.html';
 
   // 5. 拼接 intent://
   var intentUrl =
