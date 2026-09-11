@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>正在打开…</title>
+<style>
+  body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;
+       font-family:-apple-system,"PingFang SC",sans-serif;color:#666;background:#fafafa}
+</style>
+</head>
+<body>
+<div id="msg">正在打开应用…</div>
+
+<script>
+(function () {
+  var msg = document.getElementById('msg');
+
+  // 1. 取出 ? 后面的原始内容，格式形如：=包名/活动全路径
+  var raw = window.location.search.substring(1); // 去掉开头的 "?"
+  if (!raw) { msg.textContent = '缺少参数'; return; }
+
+  // 2. 去掉开头的 "="
+  var value = raw.replace(/^=/, '');
+
+  // 3. 拆成 [包名, 活动全路径]
+  var slash = value.indexOf('/');
+  if (slash < 0) { msg.textContent = '参数格式错误，应为 包名/活动全路径'; return; }
+
+  var pkg = value.substring(0, slash);
+  var activity = value.substring(slash + 1);
+  var component = pkg + '/' + activity;
+
+  // 4. 兜底地址（唤起失败时跳这里）
+  var fallbackUrl = 'https://你的域名/fallback';
+
+  // 5. 拼接 intent://
+  var intentUrl =
+    'intent://open/#Intent;' +
+    'action=android.intent.action.MAIN;' +
+    'category=android.intent.category.LAUNCHER;' +
+    'category=android.intent.category.BROWSABLE;' +
+    'package=' + pkg + ';' +
+    'component=' + component + ';' +
+    'S.browser_fallback_url=' + encodeURIComponent(fallbackUrl) + ';' +
+    'end';
+
+  // 6. 自动触发（iframe 方式兼容性最好）
+  var iframe = document.createElement('iframe');
+  iframe.style.display = 'none';
+  iframe.src = intentUrl;
+  document.body.appendChild(iframe);
+
+  // 7. 再补一刀直接跳转（部分浏览器只认这个）
+  setTimeout(function () {
+    try { window.location.href = intentUrl; } catch (e) {}
+  }, 100);
+
+  // 8. 检测是否成功（页面切到后台说明唤起成功）
+  var start = Date.now();
+  function onHide() {
+    if (Date.now() - start < 2500) msg.textContent = '已打开';
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) onHide();
+  });
+  window.addEventListener('pagehide', onHide);
+
+  // 9. 2.5 秒还没走，提示失败
+  setTimeout(function () {
+    if (!document.hidden) msg.textContent = '未检测到应用，请确认已安装';
+  }, 2500);
+})();
+</script>
+</body>
+</html>
