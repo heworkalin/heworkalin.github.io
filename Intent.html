@@ -16,7 +16,7 @@
     margin-bottom: 20px; white-space: pre-line;
   }
   #actions {
-    display: none; /* 默认隐藏，失败后才显示 */
+    display: none; /* 默认隐藏，等第一次尝试结束后统一显示 */
     flex-direction: column; gap: 12px; width: 100%; max-width: 320px;
   }
   button {
@@ -33,7 +33,7 @@
 <div id="msg">正在打开应用…</div>
 
 <div id="actions">
-  <button id="retryBtn">重试打开</button>
+  <button id="retryBtn">重新打开</button>
   <button id="downloadBtn">下载 Via 浏览器</button>
 </div>
 
@@ -44,8 +44,7 @@
   var retryBtn = document.getElementById('retryBtn');
   var downloadBtn = document.getElementById('downloadBtn');
 
-  var opened = false; // 是否成功唤起
-  var checkTimer = null; // 检测定时器
+  var checkTimer = null; // 定时器
 
   // ================= 1. 解析参数 =================
   var raw = window.location.search.substring(1);
@@ -74,53 +73,35 @@
     msg.textContent = '正在打开应用…';
     actions.style.display = 'none';
 
-    // 方式 A：iframe 触发
+    // 方式 A：iframe 触发（Via 兼容性最好，被拦截是静默的）
     var iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.src = intentUrl;
     document.body.appendChild(iframe);
 
-    // 方式 B：延迟补刀
+    // 方式 B：延迟补刀（部分浏览器只认这个，注意这会导致 Chrome 跳 Google Play）
     setTimeout(function () {
       try { window.location.href = intentUrl; } catch (e) {}
     }, 100);
 
-    // 启动失败检测
+    // 启动最终界面倒计时
     startCheck();
   }
 
-  // ================= 4. 检测是否成功唤起 =================
-  function markOpened() {
-    if (opened) return;
-    opened = true;
-    msg.textContent = '已打开';
-    actions.style.display = 'none';
-    if (checkTimer) clearTimeout(checkTimer);
-  }
-
-  document.addEventListener('visibilitychange', function () {
-    if (document.hidden) markOpened();
-  });
-  window.addEventListener('pagehide', markOpened);
-
-  // ================= 5. 失败检测（2.5秒无响应则显示按钮） =================
+  // ================= 4. 最终界面（2.5秒后无论成败，统一显示） =================
   function startCheck() {
     if (checkTimer) clearTimeout(checkTimer);
     checkTimer = setTimeout(function () {
-      if (!document.hidden && !opened) {
-        msg.textContent = '未能直接打开应用。\n\n' +
-          '说明：部分浏览器（如 Chrome、Edge 等）出于安全策略，\n' +
-          '会拦截网页直接启动其他 App 的特定页面。\n\n' +
-          'Via 浏览器支持此功能。您可以点击下方按钮重试，\n' +
-          '或下载 Via 浏览器后重新访问本链接。';
-        actions.style.display = 'flex';
-      }
+      // 不管刚才跳没跳走，只要这个页面还在，2.5秒后直接出最终界面。
+      msg.textContent = '未能直接打开应用。\n\n' +
+        '说明：部分浏览器（如 Chrome、Edge 等）出于安全策略，可能拦截网页直接启动其他 App，或者可能会直接打开系统的常见应用商店（Google Play）。\n\n' +
+        'Via 浏览器支持此功能。您可以点击下方按钮重试，或下载 Via 浏览器后重新访问本链接。';
+      actions.style.display = 'flex';
     }, 2500);
   }
 
-  // ================= 6. 按钮事件绑定 =================
+  // ================= 5. 按钮事件绑定 =================
   retryBtn.addEventListener('click', function () {
-    launched = false;
     launchApp(); // 再次触发
   });
 
@@ -128,7 +109,7 @@
     window.location.href = 'https://www.viayoo.com';
   });
 
-  // ================= 7. 初始启动 =================
+  // ================= 6. 初始启动 =================
   function showError(text) {
     msg.textContent = text;
     actions.style.display = 'none';
